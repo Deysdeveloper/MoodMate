@@ -6,8 +6,8 @@ Built using Jetpack Compose, Firebase, and a beautiful user interface, MoodMate 
 📝 Mood-Based Journaling
 Log your mood and write journal entries to reflect your emotions.
 
-😊 Animated Mood Picker
-Choose how you feel using delightful Lottie animations instead of static emojis.
+Mood Picker
+pick your mood using Emojis
 
 📅 My Journals View
 View and edit your personal journal entries at any time.

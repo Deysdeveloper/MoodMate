@@ -16,10 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.moodmate.R
+import com.example.moodmate.viewModel.JournalViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.firestore
@@ -29,7 +32,8 @@ import java.util.*
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    navController: NavHostController
+    navController: NavHostController,
+    journalViewModel: JournalViewModel = viewModel()
 ) {
     val currentDate = remember {
         val formatter = SimpleDateFormat("EEEE, MMMM d • yyyy", Locale.getDefault())
@@ -38,6 +42,9 @@ fun HomeScreen(
     var name by remember {
         mutableStateOf("")
     }
+
+    val latestJournal by journalViewModel.latestJournal.collectAsState()
+    val isLoading by journalViewModel.isLoading.collectAsState()
 
     LaunchedEffect(Unit) {
         Firebase.firestore.collection("users")
@@ -147,7 +154,6 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Mood emoji
                     Box(
                         modifier = Modifier
                             .size(56.dp)
@@ -204,51 +210,138 @@ fun HomeScreen(
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "You don't have a journal created yet",
-                            fontSize = 16.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center,
-                            fontWeight = FontWeight.Normal
-                        )
-
-                        Button(
-                            onClick = {
-                                navController.navigate("MyJournals")
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White,
-                                contentColor = Color.Black
-                            ),
-                            shape = RoundedCornerShape(24.dp),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                Color(0xFFE0E0E0)
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 0.dp
-                            ),
-                            modifier = Modifier.height(48.dp)
+                    if (isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = Color.Black
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            CircularProgressIndicator()
+                        }
+                    } else if (latestJournal != null) {
+                        // Display latest journal
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (latestJournal!!.title.isNotBlank()) {
+                                        Text(
+                                            text = latestJournal!!.title,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.Black,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    Text(
+                                        text = latestJournal!!.note,
+                                        fontSize = 14.sp,
+                                        color = Color.Gray,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    Text(
+                                        text = SimpleDateFormat(
+                                            "MMM dd, yyyy • hh:mm a",
+                                            Locale.getDefault()
+                                        )
+                                            .format(Date(latestJournal!!.timestamp)),
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+
+                                // Mood indicator
+                                if (latestJournal!!.mood.isNotBlank()) {
+                                    Text(
+                                        text = latestJournal!!.mood,
+                                        fontSize = 24.sp,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    navController.navigate("MyJournals")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF3F51B5),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "View All Journals",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    } else {
+                        // No journals yet
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
                             Text(
-                                text = "Create journal",
+                                text = "You don't have a journal created yet",
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Normal
                             )
+
+                            Button(
+                                onClick = {
+                                    navController.navigate("MyJournals")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(24.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    Color(0xFFE0E0E0)
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(
+                                    defaultElevation = 0.dp
+                                ),
+                                modifier = Modifier.height(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color.Black
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Create journal",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -280,11 +373,10 @@ fun BottomNavigationBar(navController: NavHostController) {
                 selected = selectedItem == index,
                 onClick = {
                     selectedItem = index
-                    // Handle navigation based on item.label or index
-                     when (item.label) {
-                    //     "Home" -> navController.navigate("home_screen")
-                    //     "Mood" -> navController.navigate("mood_screen")
-                    "Journal" -> navController.navigate("GlobalJournal")
+                    when (item.label) {
+                        "Home" -> navController.navigate("Home")
+                        "Mood" -> navController.navigate("MoodAssessment")
+                        "Journal" -> navController.navigate("GlobalJournal")
                     }
                 },
                 icon = {
@@ -304,6 +396,7 @@ fun BottomNavigationBar(navController: NavHostController) {
         }
     }
 }
+
 data class NavigationItem(
     val label: String,
     val icon: ImageVector

@@ -69,7 +69,6 @@ object FirebaseRepository {
                     .addOnSuccessListener { onComplete(true) }
                     .addOnFailureListener { onComplete(false) }
             } else {
-                // User doesn't own this journal or it doesn't exist
                 onComplete(false)
             }
         }.addOnFailureListener {

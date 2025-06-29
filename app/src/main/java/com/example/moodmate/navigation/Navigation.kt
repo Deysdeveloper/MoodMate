@@ -13,6 +13,7 @@ import com.example.moodmate.screens.AuthenticationScreen
 import com.example.moodmate.screens.HomeScreen
 import com.example.moodmate.screens.Journals.GlobalJournalsScreen
 import com.example.moodmate.screens.Journals.MyJournalsScreen
+import com.example.moodmate.screens.MoodAssessmentScreen
 import com.example.moodmate.screens.SignInScreen
 import com.example.moodmate.screens.SignUpScreen
 
@@ -38,11 +39,14 @@ fun Navigation(modifier: Modifier)
         composable("Home") {
             HomeScreen(modifier= Modifier,navController)
         }
+        composable("MoodAssessment") {
+            MoodAssessmentScreen(modifier = Modifier, navController)
+        }
         composable("AddJournal") {
             AddJournalScreen(modifier= Modifier,navController)
         }
         composable("GlobalJournal") {
-            GlobalJournalsScreen(modifier= Modifier,navController)
+            GlobalJournalsScreen(modifier = Modifier, navController)
         }
         composable("MyJournals") {
             MyJournalsScreen(modifier= Modifier,navController)

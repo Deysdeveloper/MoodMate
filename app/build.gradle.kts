@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.database)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     testImplementation(libs.junit)
     implementation("androidx.compose.material:material-icons-core:1.6.8") // Or the latest version
     androidTestImplementation(libs.androidx.junit)
