@@ -9,33 +9,38 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.moodmate.AppUtil
 import com.example.moodmate.model.MoodOption
 import com.example.moodmate.model.MoodQuestion
-
-
-
+import com.example.moodmate.viewModel.MoodViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoodAssessmentScreen(
     modifier: Modifier = Modifier,
-    navController: NavHostController
+    navController: NavHostController,
+    moodViewModel: MoodViewModel = viewModel()
 ) {
     var currentQuestionIndex by remember { mutableStateOf(0) }
     var answers by remember { mutableStateOf(mapOf<Int, Int>()) }
     var showResult by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
 
     val questions = listOf(
         MoodQuestion(
@@ -106,6 +111,32 @@ fun MoodAssessmentScreen(
         }
     }
 
+    fun saveMoodResult() {
+        val totalScore = answers.values.sum()
+        val averageScore = if (answers.isNotEmpty()) totalScore.toFloat() / answers.size else 0f
+        val (moodLevel, _, _) = calculateMoodResult()
+
+        // Convert answers to string-based mapping for storage
+        val responses = answers.mapKeys { entry ->
+            questions[entry.key].question
+        }
+
+        isSaving = true
+        moodViewModel.saveMoodEntry(
+            moodLevel = moodLevel,
+            moodScore = averageScore,
+            responses = responses
+        ) { success, errorMessage ->
+            isSaving = false
+            if (success) {
+                Log.d("MoodViewModel", "Mood entry saved, showing result")
+                showResult = true
+            } else {
+                AppUtil.showToast(context, errorMessage ?: "Failed to save mood assessment")
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -121,7 +152,7 @@ fun MoodAssessmentScreen(
                         navController.navigateUp()
                     }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -188,7 +219,9 @@ fun MoodAssessmentScreen(
                 Button(
                     onClick = {
                         Log.d("Navigation", "Back to home button clicked")
-                        navController.navigate("Home")
+                        navController.navigate("Home") {
+                            popUpTo("Home") { inclusive = true }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -333,11 +366,11 @@ fun MoodAssessmentScreen(
                             Log.d("Navigation", "Next question button clicked")
                             currentQuestionIndex++
                         } else {
-                            Log.d("Quiz", "See results button clicked")
-                            showResult = true
+                            Log.d("Quiz", "Save results and show button clicked")
+                            saveMoodResult()
                         }
                     },
-                    enabled = answers.containsKey(currentQuestionIndex),
+                    enabled = answers.containsKey(currentQuestionIndex) && !isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -346,11 +379,18 @@ fun MoodAssessmentScreen(
                     ),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text(
-                        text = if (currentQuestionIndex < questions.size - 1) "Next Question" else "See Results",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White
+                        )
+                    } else {
+                        Text(
+                            text = if (currentQuestionIndex < questions.size - 1) "Next Question" else "See Results",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

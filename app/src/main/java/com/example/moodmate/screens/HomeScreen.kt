@@ -23,17 +23,20 @@ import androidx.navigation.NavHostController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.moodmate.R
 import com.example.moodmate.viewModel.JournalViewModel
+import com.example.moodmate.viewModel.MoodViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.firestore
 import java.text.SimpleDateFormat
 import java.util.*
+import android.util.Log
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     navController: NavHostController,
-    journalViewModel: JournalViewModel = viewModel()
+    journalViewModel: JournalViewModel = viewModel(),
+    moodViewModel: MoodViewModel = viewModel()
 ) {
     val currentDate = remember {
         val formatter = SimpleDateFormat("EEEE, MMMM d • yyyy", Locale.getDefault())
@@ -44,14 +47,57 @@ fun HomeScreen(
     }
 
     val latestJournal by journalViewModel.latestJournal.collectAsState()
-    val isLoading by journalViewModel.isLoading.collectAsState()
+    val isJournalLoading by journalViewModel.isLoading.collectAsState()
 
-    LaunchedEffect(Unit) {
+    val latestMoodEntry by moodViewModel.latestMoodEntry.collectAsState()
+    val isMoodLoading by moodViewModel.isLoading.collectAsState()
+
+    LaunchedEffect(key1 = navController.currentDestination?.route) {
         Firebase.firestore.collection("users")
             .document(FirebaseAuth.getInstance().currentUser!!.uid)
             .get().addOnCompleteListener() {
                 name= it.result.get("name").toString().split(" ")[0]
             }
+        // Refresh mood data when screen loads or when navigating back
+        Log.d("HomeScreen", "Screen loaded/navigated to, refreshing mood data")
+        moodViewModel.refreshMoodData()
+    }
+
+    // Log mood data changes
+    LaunchedEffect(latestMoodEntry) {
+        Log.d("HomeScreen", "Mood data changed: $latestMoodEntry")
+    }
+
+    fun getMoodDisplayInfo(): Triple<String, String, Color> {
+        Log.d(
+            "HomeScreen",
+            "getMoodDisplayInfo called, latestMoodEntry: $latestMoodEntry"
+        )
+        return when (latestMoodEntry?.moodLevel) {
+            "Excellent" -> Triple("😄", "Excellent", Color(0xFF4CAF50))
+            "Good" -> Triple("😊", "Good", Color(0xFF8BC34A))
+            "Okay" -> Triple("😐", "Okay", Color(0xFFFF9800))
+            "Low" -> Triple("😔", "Low", Color(0xFFFF5722))
+            "Very Low" -> Triple("😰", "Very Low", Color(0xFFF44336))
+            else -> {
+                Log.d(
+                    "HomeScreen",
+                    "Mood level not recognized or null: ${latestMoodEntry?.moodLevel}"
+                )
+                Triple("😊", "Unknown", Color(0xFF9E9E9E))
+            }
+        }
+    }
+
+    fun getPersonalizedMessage(): String {
+        return when (latestMoodEntry?.moodLevel) {
+            "Excellent" -> "You're radiating positive energy today! Keep up the amazing work! 🌟"
+            "Good" -> "You're having a great day! Your positive mood is contagious! ✨"
+            "Okay" -> "You're doing alright today. Remember, every day has its ups and downs! 🌈"
+            "Low" -> "It's okay to have tough days. Be gentle with yourself and take it one step at a time. 💙"
+            "Very Low" -> "You're going through a difficult time. Remember, you're stronger than you know. Consider reaching out to someone. 🤗"
+            else -> "How are you feeling today? Take a moment to check in with yourself! 💫"
+        }
     }
 
     Scaffold(
@@ -132,56 +178,121 @@ fun HomeScreen(
                 fontWeight = FontWeight.Normal
             )
 
-            Text(
-                text = "How are you feeling today?",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.Black
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE3F2FD)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(
-                                Color(0xFF1976D2),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "😊",
-                            fontSize = 28.sp
-                        )
-                    }
+                Text(
+                    text = if (latestMoodEntry != null) "Your current mood" else "How are you feeling today?",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Black
+                )
 
-                    Column {
-                        Text(
-                            text = "Happy",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.Black
-                        )
-                        Text(
-                            text = "Everything is going great today!",
-                            fontSize = 14.sp,
-                            color = Color.Gray,
-                            fontWeight = FontWeight.Normal
-                        )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (latestMoodEntry != null) {
+                            getMoodDisplayInfo().third.copy(alpha = 0.1f)
+                        } else {
+                            Color(0xFFE3F2FD)
+                        }
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    if (isMoodLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color(0xFF1976D2)
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            val (emoji, moodText, moodColor) = getMoodDisplayInfo()
+
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(
+                                        if (latestMoodEntry != null) moodColor else Color(0xFF1976D2),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = emoji,
+                                    fontSize = 28.sp
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = if (latestMoodEntry != null) moodText else "Unknown",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = getPersonalizedMessage(),
+                                    fontSize = 14.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Normal,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                if (latestMoodEntry != null) {
+                                    Text(
+                                        text = "Last updated: ${
+                                            SimpleDateFormat(
+                                                "MMM dd, hh:mm a",
+                                                Locale.getDefault()
+                                            ).format(Date(latestMoodEntry!!.timestamp))
+                                        }",
+                                        fontSize = 12.sp,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (latestMoodEntry == null ||
+                            (System.currentTimeMillis() - latestMoodEntry!!.timestamp) > 24 * 60 * 60 * 1000
+                        ) { // 24 hours
+                            Button(
+                                onClick = {
+                                    navController.navigate("MoodAssessment")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF3F51B5),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp)
+                                    .padding(bottom = 20.dp)
+                            ) {
+                                Text(
+                                    text = if (latestMoodEntry == null) "Take Mood Assessment" else "Update Mood Assessment",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -210,7 +321,7 @@ fun HomeScreen(
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    if (isLoading) {
+                    if (isJournalLoading) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
